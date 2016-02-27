@@ -28,3 +28,10 @@ Download the files needed to run predictions
 The input data files will not be saved in this repository, run the following
 command to download the necessary files:
  * `./scripts/bootstrap.sh`
+
+Generate html writeup document
+------------------------------
+
+Since html documents are generated from R markdown files, there is no need
+to version control the html files, so we will generated them:
+ # `./scripts/gen_writeup.sh`

@@ -1,0 +1,8 @@
+---
+title: "Weight Lifting Exercise"
+author: "Joseph Doran"
+output: html_document
+---
+# Goal
+
+Predict the method of weight lifting used given data collected from popular exercise trackers.
