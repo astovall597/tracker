@@ -6,3 +6,74 @@ output: html_document
 # Goal
 
 Predict the method of weight lifting used given data collected from popular exercise trackers.
+
+## Motivation
+
+The popularity of wearable fitness trackers seems to be an indication of common focus on personal
+health, but most trackers simply measure the amount of exercise.  There is also evidence to suggest
+that not all exercise is created equal, not only can improper exercise mechanics be less effective
+then proper mechanice improper exercise can even cause increased pain or injury
+(see: [University of Maryland Medical Center - Exercise Report](http://umm.edu/health/medical/reports/articles/exercise)).
+
+Therefore being able to distinguish between proper and improper exercise techniques provides
+valuable information for people who wish to improve their health.
+
+# Approach
+
+Use data collected for this paper: [Qualitative Activity Recognition of Weight Lifting Exercises](http://groupware.les.inf.puc-rio.br/work.jsf?p1=11201),
+to determine if there is a reliable way to identify the differen techniques used.  A more
+detailed description of the approach can be found here: [Human Activity Recognition](http://groupware.les.inf.puc-rio.br/har),
+under the "Weight Lifting Exercise Dataset" section.
+
+# Notice
+
+You may notice that I am not using the R engine for executing R code in this document.  The software
+I am using aborts any time the render process attempts to run R code.  As a result, I will be executing
+the R code manually and copying any relevant output to this document.
+
+This also means I will be unable to provide any graphs or plots used in my analysis.  I will do my
+best to describe the important aspects of any graphs or plots during my investigation.
+
+# Data Exploration
+
+The first step in making our predictions is to understand the data we have to work with.
+
+## What's in the Data
+
+### Summarize the Data
+
+```
+training <- read.csv("data/pml-training.csv")
+dim(training)
+summary(training)
+```
+
+Output:
+```
+[1] 19622   160
+```
+
+I have ommitted the full summary output because there are 160 columns of data.  The number of columns
+is also the first challenge for this dataset.  Since I am not an expert in exercise mechanics I will
+need to either use an unsupervised learning technique, or I will need to lever some additional tools
+to focus my data exploration efforts.
+
+### Prediction Focus
+
+Looking at the type of data we are predicting:
+```
+str(training$classe)
+```
+
+Output:
+```
+ Factor w/ 5 levels "A","B","C","D",..: 1 1 1 1 1 1 1 1 1 1 ...
+```
+
+The take away here is that the form of the output data is already factored.  This simply means that
+we need to neither create factors nor evaluate using a root mean squared (or similar metric).
+
+### Data and Time
+
+The primary question we want to answer here is whether or not data points need to be analyzed in
+temporally contiguous blocks.
