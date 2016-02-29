@@ -20,9 +20,9 @@ valuable information for people who wish to improve their health.
 
 # Approach
 
-Use data collected for this paper: [Qualitative Activity Recognition of Weight Lifting Exercises](http://groupware.les.inf.puc-rio.br/work.jsf?p1=11201),
+Use data collected for this paper: [Qualitative Activity Recognition of Weight Lifting Exercises (QAR-WLE)](http://groupware.les.inf.puc-rio.br/work.jsf?p1=11201),
 to determine if there is a reliable way to identify the differen techniques used.  A more
-detailed description of the approach can be found here: [Human Activity Recognition](http://groupware.les.inf.puc-rio.br/har),
+detailed description of the approach can be found here: [Human Activity Recognition (HAR)](http://groupware.les.inf.puc-rio.br/har),
 under the "Weight Lifting Exercise Dataset" section.
 
 # Notice
@@ -43,14 +43,20 @@ The first step in making our predictions is to understand the data we have to wo
 ### Summarize the Data
 
 ```
-training <- read.csv("data/pml-training.csv")
+library(caret)
+data <- read.csv("data/pml-training.csv")
+set.seed(32334)
+inTrain <- createDataPartition(y=data$classe,p=0.7,list=FALSE)
+training <- data[inTrain,]
+testing <- data[-inTrain,]
 dim(training)
 summary(training)
 ```
 
 Output:
+
 ```
-[1] 19622   160
+[1] 13737   160
 ```
 
 I have ommitted the full summary output because there are 160 columns of data.  The number of columns
@@ -61,11 +67,13 @@ to focus my data exploration efforts.
 ### Prediction Focus
 
 Looking at the type of data we are predicting:
+
 ```
 str(training$classe)
 ```
 
 Output:
+
 ```
  Factor w/ 5 levels "A","B","C","D",..: 1 1 1 1 1 1 1 1 1 1 ...
 ```
@@ -76,4 +84,337 @@ we need to neither create factors nor evaluate using a root mean squared (or sim
 ### Data and Time
 
 The primary question we want to answer here is whether or not data points need to be analyzed in
-temporally contiguous blocks.
+temporally contiguous blocks.  The best way to describe my concern is through a hypothetical
+description of the data: imagine that each data point represent an instantaneous collection of
+raw data from the various sensors, then the ability to determine what technique used would most
+likely require that we analyze the data in contiguous time slices and apply a single classification
+to every point in that time slice.  From the QAR-WLE document, linked above:
+
+"For  feature  extraction  we  used  a  sliding  window  approach with different lengths from 0.5
+second to 2.5 seconds, with 0.5 second overlap."
+
+This statement implies that each data point in the set provided implicitly captures a small time
+slice worth of activity, so that we may be able to treat each data point independently.
+
+### Missing Data
+
+There do appear to be some missing data points, so imputation may need to be used.
+
+# Choosing a Method
+
+As I mentioned before, I am not an expert on exercise mechanics, nor do I believe I can teach
+myself the domain specific knowledge in a reasonable amount of time to make any better choices
+than a generic training algorithm, so I would prefer to use some automated training method.
+My personal preference would be to use random forests, but I fear that this may be too
+computationally demanding.
+
+## Trim the Data
+
+It might be advantageous to try to eliminate data that does not change:
+
+```
+trainingTrimmed <- training[,-(1:7)]
+invariates <- nearZeroVar(trainingTrimmed, saveMetrics=TRUE)
+invariates
+trainingTrimmed <- trainingTrimmed[,!invariates$nzv]
+dim(trainingTrimmed)
+```
+
+Output:
+
+```
+                           freqRatio percentUnique zeroVar   nzv
+roll_belt                   1.116613    8.13860377   FALSE FALSE
+pitch_belt                  1.007299   12.24430371   FALSE FALSE
+yaw_belt                    1.077994   13.15425493   FALSE FALSE
+total_accel_belt            1.066130    0.19654946   FALSE FALSE
+kurtosis_roll_belt       1922.142857    2.00917231   FALSE  TRUE
+kurtosis_picth_belt       538.200000    1.65247143   FALSE  TRUE
+kurtosis_yaw_belt          47.712766    0.01455922   FALSE  TRUE
+skewness_roll_belt       2242.500000    2.00917231   FALSE  TRUE
+skewness_roll_belt.1      538.200000    1.72526753   FALSE  TRUE
+skewness_yaw_belt          47.712766    0.01455922   FALSE  TRUE
+max_roll_belt               1.428571    1.16473757   FALSE FALSE
+max_picth_belt              1.642857    0.13831259   FALSE FALSE
+max_yaw_belt              708.157895    0.45133581   FALSE  TRUE
+min_roll_belt               1.000000    1.06282303   FALSE FALSE
+min_pitch_belt              2.025641    0.11647376   FALSE FALSE
+min_yaw_belt              708.157895    0.45133581   FALSE  TRUE
+amplitude_roll_belt         1.363636    0.80803669   FALSE FALSE
+amplitude_pitch_belt        3.191489    0.08735532   FALSE FALSE
+amplitude_yaw_belt         49.833333    0.02911844   FALSE  TRUE
+var_total_accel_belt        1.518519    0.35670088   FALSE FALSE
+avg_roll_belt               1.083333    1.04826381   FALSE FALSE
+stddev_roll_belt            1.000000    0.39309893   FALSE FALSE
+var_roll_belt               1.654545    0.49501347   FALSE FALSE
+avg_pitch_belt              1.333333    1.26665211   FALSE FALSE
+stddev_pitch_belt           1.043478    0.24750673   FALSE FALSE
+var_pitch_belt              1.403226    0.37853971   FALSE FALSE
+avg_yaw_belt                1.000000    1.37584625   FALSE FALSE
+stddev_yaw_belt             1.735294    0.33486205   FALSE FALSE
+var_yaw_belt                1.294118    0.77891825   FALSE FALSE
+gyros_belt_x                1.099562    0.96090850   FALSE FALSE
+gyros_belt_y                1.146401    0.47317464   FALSE FALSE
+gyros_belt_z                1.089286    1.17201718   FALSE FALSE
+accel_belt_x                1.073034    1.15745796   FALSE FALSE
+accel_belt_y                1.092871    0.99730654   FALSE FALSE
+accel_belt_z                1.108553    2.10380724   FALSE FALSE
+magnet_belt_x               1.152610    2.16204411   FALSE FALSE
+magnet_belt_y               1.116998    2.10380724   FALSE FALSE
+magnet_belt_z               1.039877    3.16663027   FALSE FALSE
+roll_arm                   48.895833   17.52930043   FALSE FALSE
+pitch_arm                  71.151515   20.31739099   FALSE FALSE
+yaw_arm                    30.089744   19.19633108   FALSE FALSE
+total_accel_arm             1.004739    0.48045425   FALSE FALSE
+var_accel_arm               9.000000    1.99461309   FALSE FALSE
+avg_roll_arm               50.000000    1.69614909   FALSE  TRUE
+stddev_roll_arm            50.000000    1.69614909   FALSE  TRUE
+var_roll_arm               50.000000    1.69614909   FALSE  TRUE
+avg_pitch_arm              50.000000    1.69614909   FALSE  TRUE
+stddev_pitch_arm           50.000000    1.69614909   FALSE  TRUE
+var_pitch_arm              50.000000    1.69614909   FALSE  TRUE
+avg_yaw_arm                50.000000    1.69614909   FALSE  TRUE
+stddev_yaw_arm             53.000000    1.67431026   FALSE  TRUE
+var_yaw_arm                53.000000    1.67431026   FALSE  TRUE
+gyros_arm_x                 1.045714    4.57159496   FALSE FALSE
+gyros_arm_y                 1.335958    2.64977797   FALSE FALSE
+gyros_arm_z                 1.140845    1.72526753   FALSE FALSE
+accel_arm_x                 1.040984    5.51066463   FALSE FALSE
+accel_arm_y                 1.089744    3.82179515   FALSE FALSE
+accel_arm_z                 1.032967    5.48154619   FALSE FALSE
+magnet_arm_x                1.068966    9.63092378   FALSE FALSE
+magnet_arm_y                1.066667    6.23862561   FALSE FALSE
+magnet_arm_z                1.037975    9.11407149   FALSE FALSE
+kurtosis_roll_arm         263.823529    1.69614909   FALSE  TRUE
+kurtosis_picth_arm        253.867925    1.68158987   FALSE  TRUE
+kurtosis_yaw_arm         1495.000000    1.99461309   FALSE  TRUE
+skewness_roll_arm         269.100000    1.70342870   FALSE  TRUE
+skewness_pitch_arm        253.867925    1.68158987   FALSE  TRUE
+skewness_yaw_arm         1495.000000    1.99461309   FALSE  TRUE
+max_roll_arm               16.666667    1.55783650   FALSE FALSE
+max_picth_arm              10.000000    1.41224430   FALSE FALSE
+max_yaw_arm                 1.062500    0.36398049   FALSE FALSE
+min_roll_arm               16.666667    1.47776079   FALSE FALSE
+min_pitch_arm              16.666667    1.55055689   FALSE FALSE
+min_yaw_arm                 1.058824    0.27662517   FALSE FALSE
+amplitude_roll_arm         16.666667    1.60879377   FALSE FALSE
+amplitude_pitch_arm        17.666667    1.55055689   FALSE FALSE
+amplitude_yaw_arm           1.230769    0.35670088   FALSE FALSE
+roll_dumbbell               1.020000   86.64191599   FALSE FALSE
+pitch_dumbbell              2.245098   84.45075344   FALSE FALSE
+yaw_dumbbell                1.228916   86.14690253   FALSE FALSE
+kurtosis_roll_dumbbell   2691.000000    2.02373153   FALSE  TRUE
+kurtosis_picth_dumbbell  6727.500000    2.04557036   FALSE  TRUE
+kurtosis_yaw_dumbbell      47.712766    0.01455922   FALSE  TRUE
+skewness_roll_dumbbell   3363.750000    2.01645192   FALSE  TRUE
+skewness_pitch_dumbbell  6727.500000    2.03829075   FALSE  TRUE
+skewness_yaw_dumbbell      47.712766    0.01455922   FALSE  TRUE
+max_roll_dumbbell           1.333333    1.82718206   FALSE FALSE
+max_picth_dumbbell          1.333333    1.81262284   FALSE FALSE
+max_yaw_dumbbell          840.937500    0.46589503   FALSE  TRUE
+min_roll_dumbbell           1.333333    1.75438596   FALSE FALSE
+min_pitch_dumbbell          1.666667    1.84174128   FALSE FALSE
+min_yaw_dumbbell          840.937500    0.46589503   FALSE  TRUE
+amplitude_roll_dumbbell     6.500000    1.95821504   FALSE FALSE
+amplitude_pitch_dumbbell    6.500000    1.95093543   FALSE FALSE
+amplitude_yaw_dumbbell     48.574007    0.02183883   FALSE  TRUE
+total_accel_dumbbell        1.092805    0.29846400   FALSE FALSE
+var_accel_dumbbell          5.000000    1.92909660   FALSE FALSE
+avg_roll_dumbbell           1.000000    2.00917231   FALSE FALSE
+stddev_roll_dumbbell       13.000000    1.96549465   FALSE FALSE
+var_roll_dumbbell          13.000000    1.96549465   FALSE FALSE
+avg_pitch_dumbbell          1.000000    2.00917231   FALSE FALSE
+stddev_pitch_dumbbell      13.000000    1.96549465   FALSE FALSE
+var_pitch_dumbbell         13.000000    1.96549465   FALSE FALSE
+avg_yaw_dumbbell            1.000000    2.00917231   FALSE FALSE
+stddev_yaw_dumbbell        13.000000    1.96549465   FALSE FALSE
+var_yaw_dumbbell           13.000000    1.96549465   FALSE FALSE
+gyros_dumbbell_x            1.011364    1.70342870   FALSE FALSE
+gyros_dumbbell_y            1.286420    1.98005387   FALSE FALSE
+gyros_dumbbell_z            1.087379    1.44864235   FALSE FALSE
+accel_dumbbell_x            1.029661    2.95552158   FALSE FALSE
+accel_dumbbell_y            1.023810    3.29766325   FALSE FALSE
+accel_dumbbell_z            1.054945    2.89000510   FALSE FALSE
+magnet_dumbbell_x           1.025641    7.86925821   FALSE FALSE
+magnet_dumbbell_y           1.236220    5.99839849   FALSE FALSE
+magnet_dumbbell_z           1.000000    4.81182209   FALSE FALSE
+roll_forearm               11.344538   13.57647230   FALSE FALSE
+pitch_forearm              65.853659   18.91242629   FALSE FALSE
+yaw_forearm                15.422857   12.81211327   FALSE FALSE
+kurtosis_roll_forearm     228.050847    1.63791221   FALSE  TRUE
+kurtosis_picth_forearm    224.250000    1.63063260   FALSE  TRUE
+kurtosis_yaw_forearm       47.712766    0.01455922   FALSE  TRUE
+skewness_roll_forearm     231.982759    1.63791221   FALSE  TRUE
+skewness_pitch_forearm    224.250000    1.61607338   FALSE  TRUE
+skewness_yaw_forearm       47.712766    0.01455922   FALSE  TRUE
+max_roll_forearm           19.333333    1.47048118   FALSE  TRUE
+max_picth_forearm           3.625000    0.88083279   FALSE FALSE
+max_yaw_forearm           228.050847    0.31302322   FALSE  TRUE
+min_roll_forearm           19.333333    1.38312586   FALSE  TRUE
+min_pitch_forearm           2.900000    0.99002693   FALSE FALSE
+min_yaw_forearm           228.050847    0.31302322   FALSE  TRUE
+amplitude_roll_forearm     14.500000    1.52871806   FALSE FALSE
+amplitude_pitch_forearm     3.000000    1.01914537   FALSE FALSE
+amplitude_yaw_forearm      60.336323    0.02183883   FALSE  TRUE
+total_accel_forearm         1.159170    0.48773386   FALSE FALSE
+var_accel_forearm           7.000000    2.00917231   FALSE FALSE
+avg_roll_forearm           19.333333    1.62335299   FALSE  TRUE
+stddev_roll_forearm        62.000000    1.60879377   FALSE  TRUE
+var_roll_forearm           62.000000    1.60879377   FALSE  TRUE
+avg_pitch_forearm          58.000000    1.63791221   FALSE  TRUE
+stddev_pitch_forearm       58.000000    1.63791221   FALSE  TRUE
+var_pitch_forearm          58.000000    1.63791221   FALSE  TRUE
+avg_yaw_forearm            58.000000    1.63791221   FALSE  TRUE
+stddev_yaw_forearm         60.000000    1.62335299   FALSE  TRUE
+var_yaw_forearm            60.000000    1.62335299   FALSE  TRUE
+gyros_forearm_x             1.040872    2.06740919   FALSE FALSE
+gyros_forearm_y             1.007299    5.27043750   FALSE FALSE
+gyros_forearm_z             1.138138    2.07468880   FALSE FALSE
+accel_forearm_x             1.015385    5.69993448   FALSE FALSE
+accel_forearm_y             1.012987    7.10489918   FALSE FALSE
+accel_forearm_z             1.084112    4.04746306   FALSE FALSE
+magnet_forearm_x            1.086207   10.56271384   FALSE FALSE
+magnet_forearm_y            1.163934   13.24161025   FALSE FALSE
+magnet_forearm_z            1.046512   11.76384946   FALSE FALSE
+classe                      1.469526    0.03639805   FALSE FALSE
+
+[1] 13737   100
+```
+
+Eliminating columns with near zero variance and those columns that contain meta data, we have
+removed 37.7% of the data from the training data.  It is important to remove the meta data as
+they will have very high correlattion with the target parameter (classe) by the very nature of
+their design.
+
+## Impute Missing Points
+
+Make sure that we use all the remaining columns of data.  The final testing set for which this
+model will be used has even more missing columns, so we will also address that here:
+
+```
+imputeObj <- preProcess(trainingTrimmed[,-100],method="knnImpute")
+trainingImputed <- predict(imputeObj,trainingTrimmed[,-100])
+trainingImputed$classe <- trainingTrimmed$classe
+exam <- read.csv("data/pml-testing.csv")
+examTrimmed <- exam[,-(1:7)]
+examTrimmed <- examTrimmed[,!invariates$nzv]
+inv <- nearZeroVar(examTrimmed, saveMetrics=TRUE)
+trainingSanitized <- trainingImputed[,!inv$nzv]
+```
+
+## Training with Random Forests
+
+The effort to eliminate data that is likely to not be very useful has made the successfully made
+the training problem more managable.
+
+I will proceed with the use of random forests.  This has the additional benefit of handling
+cross-validation by implicitly resampling with bootstrapping when used in conjunction with caret:
+
+```
+set.seed(32334)
+modFitExam <- train(classe ~ .,method="rf",data=trainingSanitized)
+modFitExam
+modFitExam$finalModel
+```
+
+Output:
+
+```
+Random Forest 
+
+13737 samples
+   52 predictors
+    5 classes: 'A', 'B', 'C', 'D', 'E' 
+
+No pre-processing
+Resampling: Bootstrapped (25 reps) 
+Summary of sample sizes: 13737, 13737, 13737, 13737, 13737, 13737, ... 
+Resampling results across tuning parameters:
+
+  mtry  Accuracy   Kappa      Accuracy SD  Kappa SD   
+   2    0.9885381  0.9854972  0.001984812  0.002515577
+  27    0.9890216  0.9861098  0.002534744  0.003207152
+  52    0.9770924  0.9710181  0.003640575  0.004615896
+
+Accuracy was used to select the optimal model using  the largest value.
+The final value used for the model was mtry = 27. 
+
+Call:
+ randomForest(x = x, y = y, mtry = param$mtry) 
+               Type of random forest: classification
+                     Number of trees: 500
+No. of variables tried at each split: 27
+
+        OOB estimate of  error rate: 0.73%
+Confusion matrix:
+     A    B    C    D    E class.error
+A 3900    3    2    0    1 0.001536098
+B   19 2628    9    2    0 0.011286682
+C    0   12 2376    8    0 0.008347245
+D    0    3   27 2220    2 0.014209591
+E    0    2    1    9 2513 0.004752475
+```
+
+## Random Forests Results
+
+I have successfully created a model that automatically resampled with replacement (25 repetitions;
+13737 samples in each set).  The accuracy on the training set is about 98%, which is great, but
+may be an indication of overfitting.
+
+# Predictions
+
+Despite my concerns about overfitting, I will go ahead with out-of-sample error prediction:
+
+```
+testingTrimmed <- testing[,-(1:7)]
+testingTrimmed <- testingTrimmed[,!invariates$nzv]
+imputeObj <- preProcess(testingTrimmed[,-100],method="knnImpute")
+testingImputed <- predict(imputeObj,testingTrimmed[,-100])
+testingImputed$classe <- testingTrimmed$classe
+testingSanitized <- testingImputed[,!inv$nzv]
+pred <- predict(modFitExam$finalModel,testingSanitized)
+confusionMatrix(pred,testingSanitized$classe)
+```
+
+Output:
+```
+confusionMatrix(pred,testingSanitized$classe)
+Confusion Matrix and Statistics
+
+          Reference
+Prediction    A    B    C    D    E
+         A 1672    6    0    0    0
+         B    2 1105   89    4    1
+         C    0   17  913   29    8
+         D    0   11   24  929    1
+         E    0    0    0    2 1072
+
+Overall Statistics
+                                          
+               Accuracy : 0.967           
+                 95% CI : (0.9622, 0.9714)
+    No Information Rate : 0.2845          
+    P-Value [Acc > NIR] : < 2.2e-16       
+                                          
+                  Kappa : 0.9583          
+ Mcnemar's Test P-Value : NA              
+
+Statistics by Class:
+
+                     Class: A Class: B Class: C Class: D Class: E
+Sensitivity            0.9988   0.9701   0.8899   0.9637   0.9908
+Specificity            0.9986   0.9798   0.9889   0.9927   0.9996
+Pos Pred Value         0.9964   0.9201   0.9442   0.9627   0.9981
+Neg Pred Value         0.9995   0.9927   0.9770   0.9929   0.9979
+Prevalence             0.2845   0.1935   0.1743   0.1638   0.1839
+Detection Rate         0.2841   0.1878   0.1551   0.1579   0.1822
+Detection Prevalence   0.2851   0.2041   0.1643   0.1640   0.1825
+Balanced Accuracy      0.9987   0.9750   0.9394   0.9782   0.9952
+```
+
+# Summary
+
+While the techniques used were somewhat computationally intensive, the results were practical to compute.
+In fact, my training was run in a VM on a laptop.
+
+With a predicted out-of-sample error of approximately 4%, I am happy with these results.
